@@ -330,7 +330,7 @@ const SudokuGrid = memo(function SudokuGrid({
             const prefilledCell = isPrefilled(r, c)
 
             // Dynamic styles
-            const cellBg = isSelected ? s.selectedBg : (cell.isError && showErrors) ? s.errorBg : s.cellBg
+            const cellBg = isSelected ? s.selectedBg : cell.isError ? s.errorBg : s.cellBg
             const borderTopW = r % 3 === 0 && r > 0 ? '2px' : '1px'
             const borderTopC = r % 3 === 0 && r > 0 ? s.borderBlockColor : s.borderColor
             const borderLeftW = c % 3 === 0 && c > 0 ? '2px' : '1px'
@@ -383,7 +383,7 @@ const SudokuGrid = memo(function SudokuGrid({
                     style={{
                       fontFamily: s.fontFamily,
                       fontWeight: s.fontWeight,
-                      color: (cell.isError && showErrors) ? '#ef4444' : prefilledCell ? s.prefilledColor : s.userColor,
+                      color: cell.isError ? '#ef4444' : prefilledCell ? s.prefilledColor : s.userColor,
                     }}
                   >
                     {cell.value}
