@@ -65,7 +65,7 @@ export const GRID_SKINS = [
     id: 'neon_cyber',
     name: 'Neon Cyber',
     description: 'Кибер-неоновая сетка с глоу-эффектами',
-    price: 500,
+    price: 20,
     preview: {
       bg: '#0d0221',
       accent: '#00f0ff',
@@ -108,7 +108,7 @@ export const GRID_SKINS = [
     id: 'sakura',
     name: 'Sakura',
     description: 'Нежный японский стиль с розовыми тонами',
-    price: 750,
+    price: 20,
     preview: {
       bg: '#fff5f7',
       accent: '#f472b6',
@@ -151,7 +151,7 @@ export const GRID_SKINS = [
     id: 'stealth',
     name: 'Stealth Ops',
     description: 'Тактический военный стиль с зелёным HUD',
-    price: 1000,
+    price: 20,
     preview: {
       bg: '#0a1208',
       accent: '#22c55e',
