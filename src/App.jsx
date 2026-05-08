@@ -8,6 +8,7 @@ import DuelScreen from './pages/DuelScreen.jsx'
 import AdventureMode from './pages/AdventureMode.jsx'
 import TutorialPrompt from './pages/TutorialPrompt.jsx'
 import Tutorial from './pages/Tutorial.jsx'
+import Shop from './pages/Shop.jsx'
 
 function LoadingScreen() {
   return (
@@ -31,6 +32,7 @@ function Router() {
     case 'settings': return <Settings />
     case 'duel': return <DuelScreen />
     case 'adventure': return <AdventureMode />
+    case 'shop': return <Shop />
     default: return <LoadingScreen />
   }
 }

@@ -1,11 +1,23 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useApp } from '../store/AppContext.jsx'
 import { generatePuzzle, getHint } from '../lib/sudoku.js'
 import { formatTime } from '../lib/api.js'
+import { getSkinById, getActiveSkin, loadSkinFont } from '../lib/grid_skins.js'
 
 export default function DuelScreen() {
     const { state, actions } = useApp()
     const { user } = state
+
+    const activeSkinId = useMemo(() => getActiveSkin(user?.id), [user?.id])
+    const activeSkin = useMemo(() => getSkinById(activeSkinId), [activeSkinId])
+
+    useEffect(() => {
+        if (activeSkin) {
+            loadSkinFont(activeSkin)
+        }
+    }, [activeSkin])
+
+    const s = activeSkin[state.theme === 'light' ? 'light' : 'dark']
 
     const [phase, setPhase] = useState('searching') // searching, offer, playing, finished
     const [searchTime, setSearchTime] = useState(0)
@@ -250,20 +262,72 @@ export default function DuelScreen() {
 
                     {/* My Grid */}
                     <div className="relative select-none mb-6">
-                        <div className="grid border-2 border-ink-400 dark:border-ink-300" style={{ gridTemplateColumns: 'repeat(9, 1fr)', aspectRatio: '1' }}>
+                        <div
+                            className="grid"
+                            style={{
+                                gridTemplateColumns: 'repeat(9, 1fr)',
+                                aspectRatio: '1',
+                                backgroundColor: s.gridBg,
+                                borderColor: s.borderBlockColor,
+                                borderWidth: '2px',
+                                borderStyle: 'solid',
+                            }}
+                        >
                             {board?.map((row, r) => row.map((cell, c) => {
                                 const isSelected = selected?.[0] === r && selected?.[1] === c
                                 const isHighlighted = selected && (selected[0] === r || selected[1] === c || (Math.floor(selected[0] / 3) === Math.floor(r / 3) && Math.floor(selected[1] / 3) === Math.floor(c / 3)))
-                                const isBox3 = (r % 3 === 0 && r > 0)
-                                const isCol3 = (c % 3 === 0 && c > 0)
+                                
+                                const cellBg = isSelected 
+                                    ? s.selectedBg 
+                                    : cell.isError 
+                                        ? s.errorBg 
+                                        : isHighlighted 
+                                            ? (state.theme === 'light' ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.05)') 
+                                            : s.cellBg
+                                
+                                const borderTopW = r % 3 === 0 && r > 0 ? '2px' : '1px'
+                                const borderTopC = r % 3 === 0 && r > 0 ? s.borderBlockColor : s.borderColor
+                                const borderLeftW = c % 3 === 0 && c > 0 ? '2px' : '1px'
+                                const borderLeftC = c % 3 === 0 && c > 0 ? s.borderBlockColor : s.borderColor
+
                                 return (
-                                    <button key={`${r}-${c}`} onClick={() => setSelected([r, c])} className={`relative flex items-center justify-center cursor-pointer transition-colors aspect-square ${isBox3 ? 'border-t-2 border-t-ink-400 dark:border-t-ink-300' : 'border-t border-t-ink-200 dark:border-t-ink-700'} ${isCol3 ? 'border-l-2 border-l-ink-400 dark:border-l-ink-300' : 'border-l border-l-ink-200 dark:border-l-ink-700'} ${isSelected ? 'bg-acid-dark/40 dark:bg-acid/40' : isHighlighted ? 'bg-ink-100 dark:bg-ink-800/40' : 'bg-transparent'} ${cell.isError ? 'bg-danger/20' : ''}`}>
+                                    <button
+                                        key={`${r}-${c}`}
+                                        onClick={() => setSelected([r, c])}
+                                        className="relative flex items-center justify-center cursor-pointer transition-all aspect-square"
+                                        style={{
+                                            backgroundColor: cellBg,
+                                            borderTop: `${borderTopW} solid ${borderTopC}`,
+                                            borderLeft: `${borderLeftW} solid ${borderLeftC}`,
+                                            borderRight: c === 8 ? 'none' : undefined,
+                                            borderBottom: r === 8 ? 'none' : undefined,
+                                            boxShadow: isSelected ? `inset 0 0 0 2.5px ${s.selectedRing}` : undefined,
+                                        }}
+                                    >
                                         {cell.value !== null ? (
-                                            <span className={`relative z-10 font-mono text-xl md:text-2xl ${prefilled[r][c] !== null ? 'font-bold text-ink-900 dark:text-ink-100' : 'text-green-600 dark:text-acid'} ${cell.isError ? '!text-danger' : ''}`}>{cell.value}</span>
+                                            <span
+                                                className="relative z-10 font-bold text-xl md:text-2xl"
+                                                style={{
+                                                    fontFamily: s.fontFamily,
+                                                    fontWeight: s.fontWeight,
+                                                    color: cell.isError ? '#ef4444' : prefilled[r][c] !== null ? s.prefilledColor : s.userColor,
+                                                }}
+                                            >
+                                                {cell.value}
+                                            </span>
                                         ) : cell.draft.size > 0 ? (
                                             <div className="grid grid-cols-3 gap-0 w-full h-full p-0.5">
                                                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-                                                    <span key={n} className={`text-[6px] md:text-[8px] font-mono text-center leading-none flex items-center justify-center ${cell.draft.has(n) ? 'text-ink-500 dark:text-ink-300' : 'text-transparent'}`}>{n}</span>
+                                                    <span
+                                                        key={n}
+                                                        className="text-[6px] md:text-[8px] text-center leading-none flex items-center justify-center"
+                                                        style={{
+                                                            fontFamily: s.fontFamily,
+                                                            color: cell.draft.has(n) ? s.draftColor : 'transparent',
+                                                        }}
+                                                    >
+                                                        {n}
+                                                    </span>
                                                 ))}
                                             </div>
                                         ) : null}

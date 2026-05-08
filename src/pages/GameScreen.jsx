@@ -4,11 +4,21 @@ import { checkCell, checkWin, getHint, getCellBorders } from '../lib/sudoku.js'
 import { updateGameSession, finishGameSession, updateUserBytes } from '../lib/api.js'
 import { formatTime } from '../lib/api.js'
 import { sfx, playClick } from '../lib/sounds.js'
+import { getSkinById, getActiveSkin, loadSkinFont } from '../lib/grid_skins.js'
 
 export default function GameScreen() {
   const { state, actions } = useApp()
   const { user, game } = state
   const { puzzle, sessionId, difficulty } = game
+
+  const activeSkinId = useMemo(() => getActiveSkin(user?.id), [user?.id])
+  const activeSkin = useMemo(() => getSkinById(activeSkinId), [activeSkinId])
+
+  useEffect(() => {
+    if (activeSkin) {
+      loadSkinFont(activeSkin)
+    }
+  }, [activeSkin])
 
   const { solution, cages, cageMap: cageMapRaw, prefilled } = puzzle
 
@@ -255,6 +265,8 @@ export default function GameScreen() {
             cageMapForBorders={cageMapForBorders}
             cageTopLeft={cageTopLeft}
             onCellClick={handleCellClick}
+            activeSkin={activeSkin}
+            theme={state.theme}
           />
         </div>
 
@@ -287,14 +299,24 @@ const SudokuGrid = memo(function SudokuGrid({
   cageMapForBorders,
   cageTopLeft,
   onCellClick,
+  activeSkin,
+  theme,
 }) {
   const isPrefilled = (r, c) => prefilled[r][c] !== null
+  const s = activeSkin[theme === 'light' ? 'light' : 'dark']
 
   return (
     <div className="relative select-none mb-6">
       <div
-        className="grid border-2 border-ink-400 dark:border-ink-300"
-        style={{ gridTemplateColumns: 'repeat(9, 1fr)', aspectRatio: '1' }}
+        className="grid"
+        style={{
+          gridTemplateColumns: 'repeat(9, 1fr)',
+          aspectRatio: '1',
+          backgroundColor: s.gridBg,
+          borderColor: s.borderBlockColor,
+          borderWidth: '2px',
+          borderStyle: 'solid',
+        }}
       >
         {Array.from({ length: 9 }, (_, r) =>
           Array.from({ length: 9 }, (__, c) => {
@@ -307,15 +329,30 @@ const SudokuGrid = memo(function SudokuGrid({
             const sumLabel = cageTopLeft[key]
             const prefilledCell = isPrefilled(r, c)
 
+            // Dynamic styles
+            const cellBg = isSelected ? s.selectedBg : (cell.isError && showErrors) ? s.errorBg : s.cellBg
+            const borderTopW = r % 3 === 0 && r > 0 ? '2px' : '1px'
+            const borderTopC = r % 3 === 0 && r > 0 ? s.borderBlockColor : s.borderColor
+            const borderLeftW = c % 3 === 0 && c > 0 ? '2px' : '1px'
+            const borderLeftC = c % 3 === 0 && c > 0 ? s.borderBlockColor : s.borderColor
+
             return (
               <div
                 key={key}
                 onClick={() => onCellClick(r, c)}
-                className={`relative flex items-center justify-center cursor-pointer aspect-square touch-manipulation bg-transparent ${isSelected ? 'bg-acid/30 dark:bg-acid/20 ring-2 ring-acid ring-inset' : ''} ${r % 3 === 0 && r > 0 ? 'border-t-2 border-t-ink-400 dark:border-t-ink-300' : 'border-t border-t-ink-200 dark:border-t-ink-700'} ${c % 3 === 0 && c > 0 ? 'border-l-2 border-l-ink-400 dark:border-l-ink-300' : 'border-l border-l-ink-200 dark:border-l-ink-700'} ${(cell.isError && showErrors) ? '!bg-danger/20' : ''}`}
+                className="relative flex items-center justify-center cursor-pointer aspect-square touch-manipulation transition-all"
+                style={{
+                  backgroundColor: cellBg,
+                  borderTop: `${borderTopW} solid ${borderTopC}`,
+                  borderLeft: `${borderLeftW} solid ${borderLeftC}`,
+                  borderRight: c === 8 ? 'none' : undefined,
+                  borderBottom: r === 8 ? 'none' : undefined,
+                  boxShadow: isSelected ? `inset 0 0 0 2.5px ${s.selectedRing}` : undefined,
+                }}
               >
                 {cage && (
                   <div
-                    className="absolute pointer-events-none border-ink-900/30 dark:border-acid/30 border-dashed z-0"
+                    className="absolute pointer-events-none border-dashed z-0"
                     style={{
                       top: borders.top ? '3px' : '-1px',
                       bottom: borders.bottom ? '3px' : '-1px',
@@ -325,20 +362,45 @@ const SudokuGrid = memo(function SudokuGrid({
                       borderBottomWidth: borders.bottom ? '1px' : '0',
                       borderLeftWidth: borders.left ? '1px' : '0',
                       borderRightWidth: borders.right ? '1px' : '0',
+                      borderColor: s.cageBorder,
                     }}
                   />
                 )}
                 {sumLabel !== undefined && (
-                  <span className="absolute top-1 left-1 text-[8px] md:text-[10px] font-mono opacity-50 z-10">{sumLabel}</span>
+                  <span
+                    className="absolute top-1 left-1 text-[8px] md:text-[10px] opacity-75 z-10"
+                    style={{
+                      fontFamily: s.fontFamily,
+                      color: s.sumColor === 'inherit' ? undefined : s.sumColor,
+                    }}
+                  >
+                    {sumLabel}
+                  </span>
                 )}
                 {cell.value !== null ? (
-                  <span className={`font-mono font-bold text-lg md:text-2xl ${(cell.isError && showErrors) ? 'text-danger' : prefilledCell ? 'text-ink-900 dark:text-ink-100' : 'text-green-600 dark:text-acid'}`}>
+                  <span
+                    className="text-lg md:text-2xl font-bold"
+                    style={{
+                      fontFamily: s.fontFamily,
+                      fontWeight: s.fontWeight,
+                      color: (cell.isError && showErrors) ? '#ef4444' : prefilledCell ? s.prefilledColor : s.userColor,
+                    }}
+                  >
                     {cell.value}
                   </span>
                 ) : cell.draft.size > 0 ? (
                   <div className="grid grid-cols-3 gap-0 w-full h-full p-0.5">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-                      <span key={n} className={`text-[7px] md:text-[9px] font-mono text-center ${cell.draft.has(n) ? 'text-ink-500 dark:text-ink-300' : 'text-transparent'}`}>{n}</span>
+                      <span
+                        key={n}
+                        className="text-[7px] md:text-[9px] text-center"
+                        style={{
+                          fontFamily: s.fontFamily,
+                          color: cell.draft.has(n) ? s.draftColor : 'transparent',
+                        }}
+                      >
+                        {n}
+                      </span>
                     ))}
                   </div>
                 ) : null}
