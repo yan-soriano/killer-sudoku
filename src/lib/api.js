@@ -165,18 +165,47 @@ export async function getDailyChallengeStatus(userId) {
       .eq('date', today)
       .maybeSingle()
 
-    if (scoreErr || !score) return null
+    if (scoreErr) {
+      console.error('getDailyChallengeStatus error:', scoreErr)
+      return null
+    }
+    if (!score) return null
 
     // Считаем ранг (сколько людей прошли быстрее)
-    const { count } = await supabase
-      .from('daily_scores')
-      .select('user_id', { count: 'exact', head: true })
-      .eq('date', today)
-      .lt('time_spent', score.time_spent)
+    let rank = 1
+    try {
+      const { count } = await supabase
+        .from('daily_scores')
+        .select('user_id', { count: 'exact', head: true })
+        .eq('date', today)
+        .lt('time_spent', score.time_spent)
+      rank = (count ?? 0) + 1
+    } catch { /* rank stays 1 */ }
 
-    return { ...score, rank: (count ?? 0) + 1 }
-  } catch {
+    return { ...score, rank }
+  } catch (e) {
+    console.error('getDailyChallengeStatus unexpected error:', e)
     return null
+  }
+}
+
+/** Проверить, есть ли уже запись daily_scores за сегодня (надёжная проверка) */
+export async function hasCompletedDailyChallenge(userId) {
+  try {
+    const today = getTodayLocal()
+    const { data, error } = await supabase
+      .from('daily_scores')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('date', today)
+      .maybeSingle()
+    if (error) {
+      console.error('hasCompletedDailyChallenge error:', error)
+      return false
+    }
+    return !!data
+  } catch {
+    return false
   }
 }
 
@@ -222,11 +251,14 @@ export async function submitDailyScore(userId, { timeSpent, hintsUsed, errorsCou
 export async function getDailyLeaderboard() {
   try {
     const today = getTodayLocal()
+
+    // Сначала пробуем запрос с join
     const { data, error } = await supabase
       .from('daily_scores')
       .select(`
         time_spent,
         finished_at,
+        user_id,
         users (
           id,
           username,
@@ -237,10 +269,63 @@ export async function getDailyLeaderboard() {
       .order('time_spent', { ascending: true })
       .limit(10)
 
-    if (error) throw error
+    if (error) {
+      console.warn('Leaderboard join query failed, trying fallback:', error)
+      return await getDailyLeaderboardFallback(today)
+    }
+
+    // Проверим, есть ли у всех записей users (join мог не сработать)
+    const allHaveUsers = data && data.length > 0 && data.every(d => d.users && d.users.username)
+    if (!allHaveUsers && data && data.length > 0) {
+      console.warn('Leaderboard join returned null users, using fallback')
+      return await getDailyLeaderboardFallback(today)
+    }
+
     return data || []
   } catch (err) {
     console.error('Leaderboard fetch error:', err)
+    return []
+  }
+}
+
+/** Fallback: получаем daily_scores, потом подтягиваем users отдельно */
+async function getDailyLeaderboardFallback(today) {
+  try {
+    const { data: scores, error: scoresErr } = await supabase
+      .from('daily_scores')
+      .select('time_spent, finished_at, user_id')
+      .eq('date', today)
+      .order('time_spent', { ascending: true })
+      .limit(10)
+
+    if (scoresErr || !scores || scores.length === 0) return []
+
+    // Получаем уникальные user_id
+    const userIds = [...new Set(scores.map(s => s.user_id))]
+
+    const { data: users, error: usersErr } = await supabase
+      .from('users')
+      .select('id, username, photo_url')
+      .in('id', userIds)
+
+    if (usersErr) {
+      console.error('Fallback users fetch error:', usersErr)
+    }
+
+    const usersMap = {}
+    if (users) {
+      for (const u of users) {
+        usersMap[u.id] = u
+      }
+    }
+
+    return scores.map(s => ({
+      time_spent: s.time_spent,
+      finished_at: s.finished_at,
+      users: usersMap[s.user_id] || { id: s.user_id, username: 'Unknown', photo_url: null }
+    }))
+  } catch (err) {
+    console.error('Leaderboard fallback error:', err)
     return []
   }
 }

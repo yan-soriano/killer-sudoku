@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../store/AppContext.jsx'
-import { getUserStats, getHardAttemptsToday, formatTime, getDailyChallengeStatus, getUserBytes } from '../lib/api.js'
+import { getUserStats, getHardAttemptsToday, formatTime, getDailyChallengeStatus, getUserBytes, hasCompletedDailyChallenge } from '../lib/api.js'
 import { generatePuzzle, generateDailyPuzzle } from '../lib/sudoku.js'
 import { createGameSession, incrementHardAttempts } from '../lib/api.js'
 
@@ -17,6 +17,7 @@ export default function Hub() {
   const [hardAttempts, setHardAttempts] = useState(0)
   const [loading, setLoading] = useState(null)
   const [dailyStatus, setDailyStatus] = useState(null)
+  const [dailyCompleted, setDailyCompleted] = useState(false)
   const [showPaywall, setShowPaywall] = useState(false)
   const [isUpgrading, setIsUpgrading] = useState(false)
 
@@ -27,7 +28,15 @@ export default function Hub() {
 
     getUserStats(userId).then(setStats).catch(console.error)
     getHardAttemptsToday(userId).then(setHardAttempts).catch(console.error)
-    getDailyChallengeStatus(userId).then(setDailyStatus).catch(console.error)
+    getDailyChallengeStatus(userId).then(status => {
+      setDailyStatus(status)
+      if (status) setDailyCompleted(true)
+    }).catch(console.error)
+
+    // Отдельная надёжная проверка — completed ли daily
+    hasCompletedDailyChallenge(userId).then(completed => {
+      if (completed) setDailyCompleted(true)
+    }).catch(console.error)
 
     getUserBytes(userId).then(b => {
       if (b !== bytesSnapshot) actions.updateUser({ bytes: b })
@@ -49,6 +58,12 @@ export default function Hub() {
     setLoading(difficulty)
     try {
       const puzzle = difficulty === 'daily' ? generateDailyPuzzle() : generatePuzzle(difficulty)
+
+      // Блокировка daily challenge если уже решён
+      if (difficulty === 'daily' && dailyCompleted) {
+        setLoading(null)
+        return
+      }
 
       if (difficulty === 'hard') {
         await incrementHardAttempts(user.id)
@@ -133,34 +148,42 @@ export default function Hub() {
 
       <div className="mb-8 md:mb-12">
         <button
-          onClick={() => !dailyStatus && handleStart('daily')}
-          disabled={loading === 'daily' || !!dailyStatus}
+          onClick={() => !(dailyStatus || dailyCompleted) && handleStart('daily')}
+          disabled={loading === 'daily' || !!dailyStatus || dailyCompleted}
           className={`w-full relative overflow-hidden group transition-all
-            ${dailyStatus ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'}
+            ${(dailyStatus || dailyCompleted) ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'}
           `}
         >
           <div className={`p-6 md:p-8 lg:p-10 border-2 transition-colors relative z-10
-            ${dailyStatus ? 'border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900' : 'border-acid bg-acid/5 dark:bg-acid/10'}
+            ${(dailyStatus || dailyCompleted) ? 'border-ink-200 dark:border-ink-800 bg-white dark:bg-ink-900' : 'border-acid bg-acid/5 dark:bg-acid/10'}
           `}>
             <div className="flex items-center justify-between">
               <div className="text-left">
                 <div className="text-xs font-mono text-ink-500 dark:text-ink-400 uppercase tracking-widest mb-1">Ежедневный вызов</div>
                 <div className="font-display text-3xl md:text-5xl text-green-900 dark:text-acid mb-2">DAILY CHALLENGE</div>
-                {dailyStatus ? (
+                {(dailyStatus || dailyCompleted) ? (
                   <div className="flex flex-wrap gap-2 mt-3">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-mono uppercase tracking-widest font-bold border border-green-200 dark:border-green-800">
-                      ✅ {formatTime(dailyStatus.time_spent)}
-                    </div>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-acid text-ink-900 text-xs font-mono uppercase tracking-widest font-bold border border-acid shadow-[0_0_10px_rgba(202,255,0,0.3)]">
-                      RANK #{dailyStatus.rank || '?'}
-                    </div>
+                    {dailyStatus ? (
+                      <>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-mono uppercase tracking-widest font-bold border border-green-200 dark:border-green-800">
+                          ✅ {formatTime(dailyStatus.time_spent)}
+                        </div>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-acid text-ink-900 text-xs font-mono uppercase tracking-widest font-bold border border-acid shadow-[0_0_10px_rgba(202,255,0,0.3)]">
+                          RANK #{dailyStatus.rank || '?'}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-mono uppercase tracking-widest font-bold border border-green-200 dark:border-green-800">
+                        ✅ Уже решено сегодня
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-sm font-mono text-ink-600 dark:text-ink-300">Один пазл для всех — покажи лучший результат</div>
                 )}
               </div>
               <div className="flex flex-col items-end">
-                {dailyStatus ? (
+                {(dailyStatus || dailyCompleted) ? (
                   <div className="text-acid-dark dark:text-acid animate-bounce">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
@@ -176,7 +199,7 @@ export default function Hub() {
               </div>
             </div>
           </div>
-          {!dailyStatus && <div className="absolute inset-0 bg-acid/10 skew-x-12 translate-x-full group-hover:translate-x-[-100%] transition-transform duration-1000 p-2" />}
+          {!(dailyStatus || dailyCompleted) && <div className="absolute inset-0 bg-acid/10 skew-x-12 translate-x-full group-hover:translate-x-[-100%] transition-transform duration-1000 p-2" />}
         </button>
       </div>
 
