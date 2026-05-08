@@ -142,7 +142,7 @@ export function getCellBorders(row, col, cageMap) {
 }
 
 // Временно для тестирования: почти заполненная сетка (выключи перед релизом)
-export const QUICK_TEST_PUZZLES = true
+export const QUICK_TEST_PUZZLES = false
 const QUICK_TEST_EMPTY_CELLS = 3 // сколько цифр нужно ввести самому
 
 // Главная функция — создаёт полные данные для игры
