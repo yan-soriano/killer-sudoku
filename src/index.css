@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    @apply bg-ink-50 text-ink-900 font-body antialiased transition-colors duration-300;
+    min-height: 100dvh;
+  }
+
+  .dark body {
+    @apply bg-ink-900 text-ink-100;
+  }
+}
+
+@layer utilities {}
