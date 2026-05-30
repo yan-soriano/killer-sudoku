@@ -21,18 +21,18 @@ export default function Hub() {
   const [isUpgrading, setIsUpgrading] = useState(false)
 
   useEffect(() => {
-    if (!user) return
-    getUserStats(user.id).then(setStats).catch(console.error)
-    getHardAttemptsToday(user.id).then(setHardAttempts).catch(console.error)
-    getDailyChallengeStatus(user.id).then(status => {
-      setDailyStatus(status)
-    }).catch(console.error)
+    if (!user?.id) return
+    const userId = user.id
+    const bytesSnapshot = user.bytes ?? 0
 
-    // Синхронизируем байты из БД
-    getUserBytes(user.id).then(b => {
-      actions.updateUser({ bytes: b })
+    getUserStats(userId).then(setStats).catch(console.error)
+    getHardAttemptsToday(userId).then(setHardAttempts).catch(console.error)
+    getDailyChallengeStatus(userId).then(setDailyStatus).catch(console.error)
+
+    getUserBytes(userId).then(b => {
+      if (b !== bytesSnapshot) actions.updateUser({ bytes: b })
     }).catch(console.error)
-  }, [user, state.screen])
+  }, [user?.id])
 
   const getStatFor = (diff) => stats.find(s => s.difficulty === diff)
 

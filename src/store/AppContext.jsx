@@ -87,6 +87,11 @@ export function AppProvider({ children }) {
       }
     },
     updateUser(updates) {
+      if (!state.user) return
+      const changed = Object.keys(updates).some(
+        (key) => state.user[key] !== updates[key],
+      )
+      if (!changed) return
       const updated = { ...state.user, ...updates }
       localStorage.setItem('ks_user', JSON.stringify(updated))
       dispatch({ type: 'SET_USER', payload: updated })
