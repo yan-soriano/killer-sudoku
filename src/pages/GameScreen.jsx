@@ -250,7 +250,6 @@ export default function GameScreen() {
             selected={selected}
             showErrors={showErrors}
             prefilled={prefilled}
-            solution={solution}
             cellToCageId={cellToCageId}
             cagesById={cagesById}
             cageMapForBorders={cageMapForBorders}
@@ -283,18 +282,13 @@ const SudokuGrid = memo(function SudokuGrid({
   selected,
   showErrors,
   prefilled,
-  solution,
   cellToCageId,
   cagesById,
   cageMapForBorders,
   cageTopLeft,
   onCellClick,
 }) {
-  const isFixed = (r, c) => {
-    if (prefilled[r][c] !== null) return true
-    const v = board[r][c].value
-    return v !== null && v === solution[r][c]
-  }
+  const isPrefilled = (r, c) => prefilled[r][c] !== null
 
   return (
     <div className="relative select-none mb-6">
@@ -311,13 +305,13 @@ const SudokuGrid = memo(function SudokuGrid({
             const borders = cage ? getCellBorders(r, c, cageMapForBorders) : {}
             const isSelected = selected && selected[0] === r && selected[1] === c
             const sumLabel = cageTopLeft[key]
-            const fixed = isFixed(r, c)
+            const prefilledCell = isPrefilled(r, c)
 
             return (
               <div
                 key={key}
                 onClick={() => onCellClick(r, c)}
-                className={`relative flex items-center justify-center cursor-pointer aspect-square touch-manipulation ${isSelected ? 'bg-acid/30 dark:bg-acid/20 ring-2 ring-acid ring-inset' : fixed ? 'bg-ink-50 dark:bg-ink-950' : 'bg-white dark:bg-ink-900'} ${r % 3 === 0 && r > 0 ? 'border-t-2 border-t-ink-400 dark:border-t-ink-300' : 'border-t border-t-ink-200 dark:border-t-ink-700'} ${c % 3 === 0 && c > 0 ? 'border-l-2 border-l-ink-400 dark:border-l-ink-300' : 'border-l border-l-ink-200 dark:border-l-ink-700'} ${(cell.isError && showErrors) ? '!bg-danger/20' : ''}`}
+                className={`relative flex items-center justify-center cursor-pointer aspect-square touch-manipulation bg-transparent ${isSelected ? 'bg-acid/30 dark:bg-acid/20 ring-2 ring-acid ring-inset' : ''} ${r % 3 === 0 && r > 0 ? 'border-t-2 border-t-ink-400 dark:border-t-ink-300' : 'border-t border-t-ink-200 dark:border-t-ink-700'} ${c % 3 === 0 && c > 0 ? 'border-l-2 border-l-ink-400 dark:border-l-ink-300' : 'border-l border-l-ink-200 dark:border-l-ink-700'} ${(cell.isError && showErrors) ? '!bg-danger/20' : ''}`}
               >
                 {cage && (
                   <div
@@ -338,7 +332,7 @@ const SudokuGrid = memo(function SudokuGrid({
                   <span className="absolute top-1 left-1 text-[8px] md:text-[10px] font-mono opacity-50 z-10">{sumLabel}</span>
                 )}
                 {cell.value !== null ? (
-                  <span className={`font-mono font-bold text-lg md:text-2xl ${(cell.isError && showErrors) ? 'text-danger' : fixed ? 'text-ink-900 dark:text-ink-100' : 'text-green-600 dark:text-acid'}`}>
+                  <span className={`font-mono font-bold text-lg md:text-2xl ${(cell.isError && showErrors) ? 'text-danger' : prefilledCell ? 'text-ink-900 dark:text-ink-100' : 'text-green-600 dark:text-acid'}`}>
                     {cell.value}
                   </span>
                 ) : cell.draft.size > 0 ? (
