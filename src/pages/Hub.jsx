@@ -186,18 +186,22 @@ export default function Hub() {
           onClick={() => actions.setScreen('adventure')}
           className="w-full relative overflow-hidden group transition-all cursor-pointer hover:scale-[1.02]"
         >
-          <div className="p-6 md:p-8 lg:p-10 border-2 border-green-600 bg-green-600/5 dark:bg-green-600/10 transition-colors relative z-10 overflow-hidden">
-
-            {/* Background Narrative Glitch */}
-            <div className="absolute top-0 right-0 p-2 opacity-10 font-mono text-[60px] md:text-[80px] leading-none select-none pointer-events-none">SYS_ADV</div>
+          <div className="p-6 md:p-8 lg:p-10 border-2 border-green-600/80 bg-gradient-to-br from-green-600/10 via-ink-900/5 to-green-900/10 dark:from-green-600/15 dark:via-ink-950 dark:to-green-900/20 transition-colors relative z-10 overflow-hidden">
+            <div className="absolute inset-0 adventure-grid opacity-40 pointer-events-none" style={{ '--adv-accent': '#16a34a' }} />
+            <div className="absolute top-0 right-0 p-2 opacity-[0.07] font-mono text-[60px] md:text-[80px] leading-none select-none pointer-events-none">SYS_ADV</div>
+            <div className="absolute bottom-2 left-4 text-[9px] font-mono text-green-600/60 dark:text-green-400/50 uppercase tracking-[0.3em] hidden sm:block">
+              4 узла · 4 цикла · лут
+            </div>
 
             <div className="flex items-center justify-between relative z-10">
               <div className="text-left">
                 <div className="text-xs font-mono text-green-600 dark:text-green-400 uppercase tracking-widest mb-1">Режим приключения</div>
                 <div className="font-display text-3xl md:text-5xl text-green-800 dark:text-green-500 mb-2 whitespace-nowrap">ADVENTURE</div>
-                <div className="text-sm font-mono text-ink-600 dark:text-ink-300">Очисти систему от вирусных угроз</div>
+                <div className="text-sm font-mono text-ink-600 dark:text-ink-300 max-w-[14rem] md:max-w-none">
+                  Карта угроз, ключи и награды за каждый сектор
+                </div>
               </div>
-              <div className="flex flex-col items-center justify-center w-12 h-12 md:w-16 md:h-16 bg-green-600 text-white rounded-full shadow-[0_0_20px_rgba(21,128,61,0.4)]">
+              <div className="flex flex-col items-center justify-center w-12 h-12 md:w-16 md:h-16 bg-green-600 text-white rounded-xl border border-green-400/30 shadow-[0_0_24px_rgba(21,128,61,0.35)]">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                 </svg>

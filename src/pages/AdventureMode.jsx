@@ -124,7 +124,12 @@ export default function AdventureMode() {
         }
     }
 
-    if (loading) return <div className="min-h-dvh flex items-center justify-center bg-ink-950 text-acid">ЗАГРУЗКА ДАННЫХ...</div>
+    if (loading) return (
+        <div className="min-h-dvh flex flex-col items-center justify-center gap-4 bg-ink-950 text-acid font-mono">
+            <div className="w-14 h-14 border-2 border-acid border-t-transparent rounded-full animate-spin" />
+            <div className="text-xs uppercase tracking-[0.35em]">Сканирование секторов…</div>
+        </div>
+    )
 
     const canPlay = !progress.completed_steps.includes(progress.current_step)
     const hasKeys = progress.inventory.length > 0
@@ -160,64 +165,157 @@ export default function AdventureMode() {
     return null
 }
 
+const DIFF_LABELS = { easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный' }
+
+function AdventureBackdrop({ cycle }) {
+    const light = cycle.theme === 'gold'
+    return (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
+            <div
+                className="absolute inset-0 adventure-grid opacity-60"
+                style={{ '--adv-accent': cycle.color }}
+            />
+            <div
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[80%] rounded-full blur-3xl opacity-25"
+                style={{ background: `radial-gradient(circle, ${cycle.color} 0%, transparent 70%)` }}
+            />
+            <div className={`absolute inset-0 adventure-scanlines opacity-30 ${light ? 'invert' : ''}`} />
+            {cycle.theme === 'glitch' && (
+                <div className="absolute inset-0 bg-gradient-to-br from-red-950/40 via-transparent to-black/60" />
+            )}
+            {cycle.theme === 'terminal' && (
+                <div className="absolute inset-0 bg-[repeating-linear-gradient(transparent,transparent_3px,rgba(0,255,65,0.04)_3px,rgba(0,255,65,0.04)_6px)]" />
+            )}
+            {cycle.theme === 'bsod' && (
+                <div className="absolute inset-0 bg-gradient-to-t from-[#000088]/80 via-transparent to-[#0078d7]/20" />
+            )}
+        </div>
+    )
+}
+
 function AdventureMap({
     progress, cycle, userBytes, canPlay, hasKeys, keyFlash,
     onSelect, onBack, onUseKey,
 }) {
     const currentStep = Number(progress.current_step) || 0
     const completed = progress.completed_steps || []
+    const cleared = completed.length
+    const total = cycle.steps.length
+    const light = cycle.theme === 'gold'
+    const muted = light ? 'text-black/50' : 'text-white/50'
+    const panel = light ? 'bg-black/5 border-black/15' : 'bg-black/40 border-white/10'
+    const activeStep = cycle.steps[currentStep]
 
     return (
-        <div className={`min-h-dvh ${cycle.bg} text-white flex flex-col p-6 font-mono overflow-hidden relative transition-colors duration-1000`}>
-            <div className="absolute inset-0 opacity-20 pointer-events-none overflow-hidden">
-                {cycle.theme === 'glitch' && <div className="absolute inset-0 bg-red-900 animate-pulse" />}
-                {cycle.theme === 'terminal' && <div className="absolute inset-0 bg-[repeating-linear-gradient(transparent,transparent_2px,rgba(0,255,65,0.1)_2px,rgba(0,255,65,0.1)_4px)]" />}
-            </div>
+        <div
+            className={`min-h-dvh ${cycle.bg} flex flex-col p-4 md:p-6 font-mono overflow-hidden relative transition-colors duration-700`}
+            style={{ '--adv-accent': cycle.color }}
+        >
+            <AdventureBackdrop cycle={cycle} />
 
-            <div className="flex justify-between items-center mb-6 relative z-10">
-                <button type="button" onClick={onBack} className="text-sm opacity-50 hover:opacity-100 transition-opacity">← В МЕНЮ</button>
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 px-3 py-1 border border-white/20 rounded-full">
-                        <div className="w-3 h-3 rounded-full bg-acid" />
-                        <span className="font-bold text-sm">{userBytes} B</span>
-                    </div>
-                    <div className="text-right">
-                        <div className="text-[10px] opacity-70">УГРОЗА</div>
-                        <div className="text-xl font-display tracking-widest" style={{ color: cycle.color }}>{cycle.name}</div>
+            {/* HUD header */}
+            <header className="relative z-10 flex flex-col gap-3 mb-4 max-w-lg mx-auto w-full">
+                <div className="flex justify-between items-start gap-3">
+                    <button
+                        type="button"
+                        onClick={onBack}
+                        className={`text-[10px] uppercase tracking-widest px-3 py-2 border ${panel} backdrop-blur-sm hover:border-current transition-colors`}
+                        style={{ borderColor: `${cycle.color}44`, color: cycle.color }}
+                    >
+                        ← Меню
+                    </button>
+                    <div className={`flex items-center gap-2 px-3 py-1.5 border rounded-full backdrop-blur-sm ${panel}`}>
+                        <div className="w-2.5 h-2.5 rounded-full bg-acid shadow-[0_0_8px_#c8ff00]" />
+                        <span className="font-bold text-sm tabular-nums">{userBytes} B</span>
                     </div>
                 </div>
-            </div>
 
-            <div className="flex-1 flex flex-col items-center justify-center relative z-10">
-                <div className="text-center mb-8">
-                    <div className="text-sm tracking-[0.2em] mb-2 uppercase opacity-80">Система заражена</div>
-                    <div className="text-4xl font-display uppercase tracking-widest">Вирусная атака</div>
+                <div className={`p-4 border backdrop-blur-md ${panel}`}>
+                    <div className="flex justify-between items-start gap-4">
+                        <div>
+                            <div className={`text-[9px] uppercase tracking-[0.25em] ${muted}`}>Цикл {progress.current_cycle} · угроза</div>
+                            <div className="font-display text-2xl md:text-3xl tracking-widest leading-none mt-1" style={{ color: cycle.color }}>
+                                {cycle.name}
+                            </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                            <div className={`text-[9px] uppercase tracking-widest ${muted}`}>Сложность</div>
+                            <div className="text-xs font-bold uppercase mt-0.5" style={{ color: cycle.color }}>
+                                {DIFF_LABELS[cycle.difficulty] || cycle.difficulty}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="mt-4">
+                        <div className="flex justify-between text-[9px] uppercase tracking-widest mb-1.5">
+                            <span className={muted}>Очистка сектора</span>
+                            <span style={{ color: cycle.color }}>{cleared}/{total}</span>
+                        </div>
+                        <div className={`h-1.5 rounded-full overflow-hidden ${light ? 'bg-black/10' : 'bg-white/10'}`}>
+                            <div
+                                className="h-full rounded-full transition-all duration-700"
+                                style={{ width: `${(cleared / total) * 100}%`, backgroundColor: cycle.color, boxShadow: `0 0 12px ${cycle.color}` }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            {/* Map */}
+            <div className="flex-1 flex flex-col items-center justify-center relative z-10 py-2">
+                <div className="text-center mb-5 px-4">
+                    <div className={`text-[10px] tracking-[0.3em] uppercase ${muted}`}>Карта заражения</div>
+                    <div className={`font-display text-3xl md:text-4xl uppercase tracking-widest mt-1 ${light ? 'text-black' : 'text-white'}`}>
+                        Вирусная сеть
+                    </div>
                 </div>
 
-                <div className="relative w-full max-w-sm aspect-square flex items-center justify-center">
-                    <svg className="absolute inset-0 w-full h-full pointer-events-none">
+                <div className="relative w-full max-w-[min(100%,22rem)] aspect-square">
+                    {/* Outer ring */}
+                    <div
+                        className="absolute inset-[8%] rounded-full border border-dashed opacity-30"
+                        style={{ borderColor: cycle.color }}
+                    />
+
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100">
                         {[0, 1, 2].map(i => {
-                            const x1 = 50 + 35 * Math.cos((i * 90 - 45) * Math.PI / 180)
-                            const y1 = 50 + 35 * Math.sin((i * 90 - 45) * Math.PI / 180)
-                            const x2 = 50 + 35 * Math.cos(((i + 1) * 90 - 45) * Math.PI / 180)
-                            const y2 = 50 + 35 * Math.sin(((i + 1) * 90 - 45) * Math.PI / 180)
+                            const a1 = (i * 90 - 45) * Math.PI / 180
+                            const a2 = ((i + 1) * 90 - 45) * Math.PI / 180
+                            const r = 38
+                            const x1 = 50 + r * Math.cos(a1)
+                            const y1 = 50 + r * Math.sin(a1)
+                            const x2 = 50 + r * Math.cos(a2)
+                            const y2 = 50 + r * Math.sin(a2)
                             const isPassed = completed.includes(i)
                             return (
                                 <line
                                     key={i}
-                                    x1={`${x1}%`} y1={`${y1}%`} x2={`${x2}%`} y2={`${y2}%`}
-                                    stroke={isPassed ? cycle.color : '#333'}
-                                    strokeWidth="3"
-                                    strokeDasharray={isPassed ? 'none' : '5,5'}
+                                    x1={x1} y1={y1} x2={x2} y2={y2}
+                                    stroke={isPassed ? cycle.color : light ? '#00000022' : '#ffffff18'}
+                                    strokeWidth={isPassed ? 2.5 : 1.5}
+                                    strokeDasharray={isPassed ? undefined : '4 4'}
+                                    style={isPassed ? { filter: `drop-shadow(0 0 4px ${cycle.color})` } : undefined}
                                 />
                             )
                         })}
                     </svg>
 
+                    {/* Core */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[28%] aspect-square">
+                        <div
+                            className={`w-full h-full rounded-full border-2 flex flex-col items-center justify-center backdrop-blur-sm ${panel}`}
+                            style={{ borderColor: cycle.color, boxShadow: `0 0 40px ${cycle.color}33, inset 0 0 20px ${cycle.color}15` }}
+                        >
+                            <svg className="w-1/2 h-1/2 opacity-90" viewBox="0 0 24 24" fill="none" stroke={cycle.color} strokeWidth="1.5">
+                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                            </svg>
+                            <span className="text-[7px] uppercase tracking-widest mt-1 opacity-60" style={{ color: cycle.color }}>ядро</span>
+                        </div>
+                    </div>
+
                     {cycle.steps.map((step, i) => {
                         const angle = (i * 90 - 45) * Math.PI / 180
-                        const x = 50 + 35 * Math.cos(angle)
-                        const y = 50 + 35 * Math.sin(angle)
+                        const x = 50 + 38 * Math.cos(angle)
+                        const y = 50 + 38 * Math.sin(angle)
                         const isPassed = completed.includes(i)
                         const isPlayable = i === currentStep && canPlay
                         const isLocked = !isPassed && !isPlayable
@@ -226,7 +324,7 @@ function AdventureMap({
                         return (
                             <div
                                 key={i}
-                                className="absolute -translate-x-1/2 -translate-y-1/2"
+                                className="absolute -translate-x-1/2 -translate-y-1/2 w-[4.5rem]"
                                 style={{ left: `${x}%`, top: `${y}%` }}
                             >
                                 <button
@@ -234,26 +332,49 @@ function AdventureMap({
                                     disabled={isLocked}
                                     onClick={isPlayable ? onSelect : undefined}
                                     className={`
-                                        w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all duration-500
-                                        ${isPassed ? 'border-none bg-green-500 text-white shadow-[0_0_20px_rgba(34,197,94,0.5)]' : ''}
-                                        ${isPlayable ? 'border-white scale-110 shadow-2xl animate-pulse bg-white/10' : ''}
-                                        ${justUnlocked ? 'ring-4 ring-acid scale-125' : ''}
-                                        ${isLocked ? 'border-white/10 text-white/10 bg-black/20' : ''}
+                                        relative mx-auto w-[3.25rem] h-[3.25rem] rounded-xl border-2 flex flex-col items-center justify-center
+                                        transition-all duration-300 backdrop-blur-sm
+                                        ${isPassed ? 'border-green-500/80 bg-green-500/20 text-green-400 shadow-[0_0_16px_rgba(34,197,94,0.35)]' : ''}
+                                        ${isPlayable ? 'scale-105 shadow-lg' : ''}
+                                        ${justUnlocked ? 'ring-2 ring-acid scale-110' : ''}
+                                        ${isLocked ? `${light ? 'border-black/10 bg-black/5 text-black/20' : 'border-white/10 bg-black/30 text-white/20'}` : ''}
+                                        ${!isPassed && !isLocked && !isPlayable ? panel : ''}
                                     `}
+                                    style={isPlayable ? {
+                                        borderColor: cycle.color,
+                                        boxShadow: `0 0 24px ${cycle.color}55`,
+                                        backgroundColor: `${cycle.color}18`,
+                                    } : undefined}
                                 >
+                                    {isPlayable && (
+                                        <span
+                                            className="absolute -inset-1 rounded-xl border animate-pulse opacity-60 pointer-events-none"
+                                            style={{ borderColor: cycle.color }}
+                                        />
+                                    )}
                                     {isPassed ? (
-                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                                             <path d="M5 13l4 4L19 7" />
                                         </svg>
                                     ) : isLocked ? (
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                                         </svg>
                                     ) : (
-                                        <div className="text-xl font-bold">{i + 1}</div>
+                                        <span className="font-display text-xl leading-none" style={{ color: isPlayable ? cycle.color : undefined }}>
+                                            {String(i + 1).padStart(2, '0')}
+                                        </span>
                                     )}
+                                    <span className="text-[6px] uppercase tracking-wider opacity-70 mt-0.5">
+                                        {step.bytes}B
+                                    </span>
                                 </button>
-                                <div className={`mt-3 text-center whitespace-nowrap text-[10px] tracking-widest uppercase ${isLocked ? 'opacity-20' : 'opacity-100'}`}>
+                                <div
+                                    className={`mt-2 text-center text-[9px] leading-tight uppercase tracking-wide px-1
+                                        ${isLocked ? 'opacity-25' : 'opacity-90'}
+                                        ${light && !isLocked ? 'text-black/80' : ''}
+                                    `}
+                                >
                                     {step.name}
                                 </div>
                             </div>
@@ -262,7 +383,8 @@ function AdventureMap({
                 </div>
             </div>
 
-            <div className="mt-6 space-y-4 relative z-10">
+            {/* Footer panel */}
+            <footer className="relative z-10 mt-auto space-y-3 max-w-lg mx-auto w-full pb-2">
                 <AdventureInventory
                     items={progress.inventory}
                     accentColor={cycle.color}
@@ -270,82 +392,135 @@ function AdventureMap({
                 />
 
                 {hasKeys && !canPlay && (
-                    <p className="text-center text-xs uppercase tracking-widest opacity-70 animate-pulse px-4">
-                        ↑ {progress.inventory[0]?.useVerb || 'Используй предмет'} в инвентаре, чтобы открыть «{progress.inventory[0]?.targetStepName}»
+                    <p className={`text-center text-[10px] uppercase tracking-widest px-3 leading-relaxed ${muted}`}>
+                        {progress.inventory[0]?.useVerb || 'Используй предмет'} → «{progress.inventory[0]?.targetStepName}»
                     </p>
                 )}
 
-                <div className="text-center">
-                    <div className="text-[10px] opacity-40 mb-1">
-                        {canPlay ? 'АКТИВНЫЙ УЗЕЛ' : hasKeys ? 'ОЖИДАНИЕ КЛЮЧА' : 'ЗАВЕРШЕНО'}
+                <div className={`p-4 border backdrop-blur-md text-center ${panel}`}>
+                    <div className={`text-[9px] uppercase tracking-[0.2em] ${muted}`}>
+                        {canPlay ? '● активный узел' : hasKeys ? '○ ожидание ключа' : '✓ сектор очищен'}
                     </div>
-                    <div className="text-lg uppercase tracking-[0.3em] font-display">
-                        {cycle.steps[currentStep]?.name}
+                    <div
+                        className={`font-display text-xl uppercase tracking-[0.2em] mt-1 ${light ? 'text-black' : 'text-white'}`}
+                        style={canPlay ? { color: cycle.color } : undefined}
+                    >
+                        {activeStep?.name || '—'}
                     </div>
+                    {activeStep && (
+                        <p className={`text-[10px] mt-2 leading-relaxed max-w-xs mx-auto ${muted}`}>
+                            {activeStep.desc}
+                        </p>
+                    )}
                     {canPlay && (
                         <button
                             type="button"
                             onClick={onSelect}
-                            className="mt-4 px-12 py-4 bg-white text-black font-bold uppercase tracking-[0.2em] hover:scale-105 transition-transform"
+                            className="mt-4 w-full py-3.5 font-bold uppercase tracking-[0.2em] text-sm transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                            style={{ backgroundColor: cycle.color, color: light ? '#000' : '#000' }}
                         >
-                            Начать взлом
+                            Начать взлом →
                         </button>
                     )}
                 </div>
-            </div>
+            </footer>
         </div>
     )
 }
 
 function AdventurePreLevel({ cycle, step, stepIdx, onStart, onBack }) {
     const lootPreview = getStepLootPreview(stepIdx)
+    const light = cycle.theme === 'gold'
+    const muted = light ? 'text-black/50' : 'text-white/50'
+    const panel = light ? 'bg-black/5 border-black/15' : 'bg-black/40 border-white/10'
+    const textMain = light ? 'text-black' : 'text-white'
 
     return (
-        <div className={`min-h-dvh ${cycle.bg} text-white flex flex-col p-8 font-mono`}>
-            <button type="button" onClick={onBack} className="self-start text-xs opacity-50 hover:opacity-100 mb-12 uppercase tracking-widest">← Назад к карте</button>
+        <div className={`min-h-dvh ${cycle.bg} flex flex-col p-4 md:p-8 font-mono relative overflow-hidden`} style={{ '--adv-accent': cycle.color }}>
+            <AdventureBackdrop cycle={cycle} />
 
-            <div className="flex-1 max-w-lg mx-auto flex flex-col justify-center">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 border-2 border-white/20 flex items-center justify-center text-2xl font-bold">
-                        {stepIdx + 1}
+            <button
+                type="button"
+                onClick={onBack}
+                className={`relative z-10 self-start text-[10px] uppercase tracking-widest px-3 py-2 border backdrop-blur-sm mb-6 ${panel}`}
+                style={{ borderColor: `${cycle.color}44`, color: cycle.color }}
+            >
+                ← Карта
+            </button>
+
+            <div className={`relative z-10 flex-1 max-w-lg mx-auto w-full flex flex-col justify-center pb-8`}>
+                <div className={`p-5 md:p-6 border backdrop-blur-md ${panel}`}>
+                    <div className="flex items-start gap-4">
+                        <div
+                            className="shrink-0 w-14 h-14 border-2 flex flex-col items-center justify-center font-display"
+                            style={{ borderColor: cycle.color, color: cycle.color, boxShadow: `0 0 20px ${cycle.color}33` }}
+                        >
+                            <span className="text-2xl leading-none">{String(stepIdx + 1).padStart(2, '0')}</span>
+                            <span className="text-[7px] uppercase tracking-widest opacity-70">узел</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <div className={`text-[9px] uppercase tracking-[0.25em] ${muted}`}>
+                                {cycle.name} · {DIFF_LABELS[cycle.difficulty]}
+                            </div>
+                            <h1 className="font-display text-2xl md:text-3xl uppercase tracking-widest leading-tight mt-1" style={{ color: cycle.color }}>
+                                {step.name}
+                            </h1>
+                        </div>
                     </div>
-                    <div>
-                        <div className="text-[10px] opacity-50 uppercase tracking-widest">Шаг {stepIdx + 1}</div>
-                        <div className="text-2xl font-display uppercase tracking-widest" style={{ color: cycle.color }}>{step.name}</div>
-                    </div>
+
+                    <blockquote className={`mt-5 pl-4 border-l-2 text-sm md:text-base leading-relaxed italic ${textMain} opacity-90`} style={{ borderColor: cycle.color }}>
+                        {step.desc}
+                    </blockquote>
                 </div>
 
-                <p className="text-lg leading-relaxed mb-12 font-light opacity-90 italic">"{step.desc}"</p>
-
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="p-4 bg-white/5 border border-white/10">
-                        <div className="text-[10px] opacity-50 uppercase mb-2">Награда</div>
-                        <div className="text-xl font-display" style={{ color: cycle.color }}>{step.bytes} B</div>
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div className={`p-4 border backdrop-blur-sm ${panel}`}>
+                        <div className={`text-[9px] uppercase tracking-widest ${muted}`}>Награда</div>
+                        <div className="font-display text-3xl mt-1 tabular-nums" style={{ color: cycle.color }}>
+                            +{step.bytes}
+                            <span className="text-lg ml-1 opacity-80">B</span>
+                        </div>
+                        {stepIdx === 3 && (
+                            <div className={`text-[9px] mt-2 ${muted}`}>+{cycle.bonus} B за цикл</div>
+                        )}
                     </div>
-                    <div className="p-4 bg-white/5 border border-white/10 flex flex-col items-center text-center">
-                        <div className="text-[10px] opacity-50 uppercase mb-2">
+                    <div className={`p-4 border backdrop-blur-sm flex flex-col items-center text-center ${panel}`}>
+                        <div className={`text-[9px] uppercase tracking-widest ${muted}`}>
                             {lootPreview?.categoryLabel || 'Добыча'}
                         </div>
-                        {lootPreview && (
-                            <AdventureItemIcon type={lootPreview.icon} color={cycle.color} size="sm" />
-                        )}
-                        <div className="text-sm font-bold uppercase tracking-tighter mt-2">{step.detail}</div>
+                        <div className="my-2 p-2 rounded-lg" style={{ backgroundColor: `${cycle.color}15` }}>
+                            {lootPreview && <AdventureItemIcon type={lootPreview.icon} color={cycle.color} size="sm" />}
+                        </div>
+                        <div className={`text-xs font-bold uppercase tracking-tight ${textMain}`}>{step.detail}</div>
                     </div>
                 </div>
 
                 {lootPreview && stepIdx < 3 && (
-                    <p className="text-xs font-mono opacity-60 mb-8 leading-relaxed border-l-2 pl-3" style={{ borderColor: cycle.color }}>
-                        После победы получишь «{step.detail}». {lootPreview.useVerb} на карте откроет следующий узел.
-                    </p>
+                    <div className={`mt-4 p-3 border text-[10px] leading-relaxed ${panel}`} style={{ borderColor: `${cycle.color}33` }}>
+                        <span className="uppercase tracking-widest font-bold" style={{ color: cycle.color }}>Миссия: </span>
+                        <span className={muted}>
+                            после победы — «{step.detail}». {lootPreview.useVerb} на карте откроет следующий узел.
+                        </span>
+                    </div>
                 )}
 
-                <button
-                    type="button"
-                    onClick={onStart}
-                    className="w-full py-5 bg-white text-black font-bold uppercase tracking-[0.3em] text-xl hover:bg-opacity-90 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)]"
-                >
-                    Начать взлом
-                </button>
+                <div className="mt-6 flex flex-col gap-2">
+                    <div className={`flex justify-between text-[9px] uppercase tracking-widest px-1 ${muted}`}>
+                        <span>Готовность</span>
+                        <span style={{ color: cycle.color }}>100%</span>
+                    </div>
+                    <div className={`h-1 rounded-full overflow-hidden ${light ? 'bg-black/10' : 'bg-white/10'}`}>
+                        <div className="h-full w-full rounded-full" style={{ backgroundColor: cycle.color }} />
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onStart}
+                        className="mt-4 w-full py-4 font-bold uppercase tracking-[0.25em] text-base transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                        style={{ backgroundColor: cycle.color, color: '#000', boxShadow: `0 8px 32px ${cycle.color}44` }}
+                    >
+                        Запустить взлом →
+                    </button>
+                </div>
             </div>
         </div>
     )

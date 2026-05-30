@@ -18,6 +18,23 @@
 }
 
 @layer utilities {
+  .adventure-grid {
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--adv-accent, #c8ff00) 8%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--adv-accent, #c8ff00) 8%, transparent) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  .adventure-scanlines {
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.12) 2px,
+      rgba(0, 0, 0, 0.12) 4px
+    );
+  }
+
   /* Снижает нагрузку GPU от бесконечных tailwind-анимаций */
   @media (prefers-reduced-motion: reduce) {
     *,

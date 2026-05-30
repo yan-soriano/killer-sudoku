@@ -32,7 +32,7 @@ export default function Onboarding() {
     setError('')
     try {
       const user = await registerUser(username.trim(), password, photoBase64)
-      actions.login(user)
+      actions.login(user, { isNewUser: true })
     } catch (e) {
       setError(e.message || 'Ошибка регистрации')
     } finally {

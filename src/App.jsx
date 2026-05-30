@@ -6,6 +6,8 @@ import ResultScreen from './pages/ResultScreen.jsx'
 import Settings from './pages/Settings.jsx'
 import DuelScreen from './pages/DuelScreen.jsx'
 import AdventureMode from './pages/AdventureMode.jsx'
+import TutorialPrompt from './pages/TutorialPrompt.jsx'
+import Tutorial from './pages/Tutorial.jsx'
 
 function LoadingScreen() {
   return (
@@ -21,6 +23,8 @@ function Router() {
   switch (state.screen) {
     case 'loading': return <LoadingScreen />
     case 'onboarding': return <Onboarding />
+    case 'tutorial-prompt': return <TutorialPrompt />
+    case 'tutorial': return <Tutorial />
     case 'hub': return <Hub />
     case 'game': return <GameScreen />
     case 'result': return <ResultScreen />

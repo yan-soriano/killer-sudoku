@@ -5,15 +5,15 @@ const AppContext = createContext(null)
 
 const initialState = {
   user: null,          // объект пользователя из БД
-  screen: 'loading',  // loading | onboarding | hub | game | result | settings
+  screen: 'loading',  // loading | onboarding | tutorial-prompt | tutorial | hub | game | result | settings
   game: null,          // текущая игровая сессия
-  theme: 'light',
+  theme: 'dark',
 }
 
 function reducer(state, action) {
   switch (action.type) {
     case 'SET_USER':
-      return { ...state, user: action.payload, theme: action.payload?.theme ?? 'light' }
+      return { ...state, user: action.payload, theme: action.payload?.theme ?? 'dark' }
     case 'SET_SCREEN':
       return { ...state, screen: action.payload }
     case 'SET_GAME':
@@ -56,10 +56,29 @@ export function AppProvider({ children }) {
     document.documentElement.classList.toggle('dark', state.theme === 'dark')
   }, [state.theme])
 
+  const markTutorialDone = (user) => {
+    const updated = { ...user, tutorial_completed: true }
+    localStorage.setItem('ks_user', JSON.stringify(updated))
+    dispatch({ type: 'SET_USER', payload: updated })
+    return updated
+  }
+
   const actions = {
-    login(user) {
+    login(user, { isNewUser = false } = {}) {
       localStorage.setItem('ks_user', JSON.stringify(user))
       dispatch({ type: 'SET_USER', payload: user })
+      if (isNewUser && !user.tutorial_completed) {
+        dispatch({ type: 'SET_SCREEN', payload: 'tutorial-prompt' })
+      } else {
+        dispatch({ type: 'SET_SCREEN', payload: 'hub' })
+      }
+    },
+    skipTutorial() {
+      if (state.user) markTutorialDone(state.user)
+      dispatch({ type: 'SET_SCREEN', payload: 'hub' })
+    },
+    completeTutorial() {
+      if (state.user) markTutorialDone(state.user)
       dispatch({ type: 'SET_SCREEN', payload: 'hub' })
     },
     logout() {

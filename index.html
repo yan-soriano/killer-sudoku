@@ -1,6 +1,19 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      (function () {
+        var theme = 'dark'
+        try {
+          var saved = localStorage.getItem('ks_user')
+          if (saved) {
+            var user = JSON.parse(saved)
+            if (user.theme) theme = user.theme
+          }
+        } catch (_) {}
+        if (theme === 'dark') document.documentElement.classList.add('dark')
+      })()
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Killer Sudoku</title>
