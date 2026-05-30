@@ -141,6 +141,10 @@ export function getCellBorders(row, col, cageMap) {
   return borders
 }
 
+// Временно для тестирования: почти заполненная сетка (выключи перед релизом)
+export const QUICK_TEST_PUZZLES = true
+const QUICK_TEST_EMPTY_CELLS = 3 // сколько цифр нужно ввести самому
+
 // Главная функция — создаёт полные данные для игры
 export function generatePuzzle(difficulty, seed = null) {
   const solution = generateSolution()
@@ -149,7 +153,9 @@ export function generatePuzzle(difficulty, seed = null) {
 
   // Для easy/medium — предзаполненные клетки
   let prefilledCount = 0
-  if (difficulty === 'easy') prefilledCount = 35
+  if (QUICK_TEST_PUZZLES) {
+    prefilledCount = 81 - QUICK_TEST_EMPTY_CELLS
+  } else if (difficulty === 'easy') prefilledCount = 35
   else if (difficulty === 'medium') prefilledCount = 25
 
   const prefilled = Array.from({ length: 9 }, () => Array(9).fill(null))

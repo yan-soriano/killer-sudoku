@@ -1,4 +1,5 @@
 import { createContext, useContext, useReducer, useEffect } from 'react'
+import { getUserBytes } from '../lib/api.js'
 
 const AppContext = createContext(null)
 
@@ -37,6 +38,11 @@ export function AppProvider({ children }) {
         const user = JSON.parse(saved)
         dispatch({ type: 'SET_USER', payload: user })
         dispatch({ type: 'SET_SCREEN', payload: 'hub' })
+        getUserBytes(user.id).then(bytes => {
+          const withBytes = { ...user, bytes }
+          localStorage.setItem('ks_user', JSON.stringify(withBytes))
+          dispatch({ type: 'SET_USER', payload: withBytes })
+        }).catch(() => {})
       } catch {
         dispatch({ type: 'SET_SCREEN', payload: 'onboarding' })
       }

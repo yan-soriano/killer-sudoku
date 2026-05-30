@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react'
 import { useApp } from '../store/AppContext.jsx'
 import { updateUserTheme, updateUserPhoto } from '../lib/api.js'
+import { isSoundEnabled, setSoundEnabled, playClick } from '../lib/sounds.js'
 
 export default function Settings() {
   const { state, actions } = useApp()
   const { user, theme } = state
   const [photoPreview, setPhotoPreview] = useState(user?.photo_url || null)
   const [saving, setSaving] = useState(false)
+  const [soundOn, setSoundOn] = useState(isSoundEnabled())
   const fileRef = useRef()
 
   const handleTheme = async (t) => {
@@ -83,6 +85,27 @@ export default function Settings() {
         <div className="font-mono text-lg md:text-2xl text-ink-900 dark:text-ink-200 bg-ink-100 dark:bg-ink-800 px-4 md:px-6 py-3 md:py-5 border border-ink-300 dark:border-ink-700 transition-colors">
           {user?.username}
         </div>
+      </div>
+
+      {/* Sound */}
+      <div className="mb-8">
+        <div className="text-xs font-mono text-ink-500 dark:text-ink-400 uppercase tracking-widest mb-3">Звук</div>
+        <button
+          type="button"
+          onClick={() => {
+            const next = !soundOn
+            setSoundOn(next)
+            setSoundEnabled(next)
+            if (next) playClick()
+          }}
+          className={`w-full py-3 font-mono text-sm uppercase tracking-widest border transition-colors
+            ${soundOn
+              ? 'border-acid-dark dark:border-acid text-acid-dark dark:text-acid bg-acid/5'
+              : 'border-ink-300 dark:border-ink-700 text-ink-500'}
+          `}
+        >
+          {soundOn ? '🔊 Звук включён' : '🔇 Звук выключен'}
+        </button>
       </div>
 
       {/* Theme */}

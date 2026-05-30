@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../store/AppContext.jsx'
-import { getUserStats, getHardAttemptsToday, formatTime, getDailyChallengeStatus } from '../lib/api.js'
+import { getUserStats, getHardAttemptsToday, formatTime, getDailyChallengeStatus, getUserBytes } from '../lib/api.js'
 import { generatePuzzle, generateDailyPuzzle } from '../lib/sudoku.js'
 import { createGameSession, incrementHardAttempts } from '../lib/api.js'
 
@@ -25,8 +25,12 @@ export default function Hub() {
     getUserStats(user.id).then(setStats).catch(console.error)
     getHardAttemptsToday(user.id).then(setHardAttempts).catch(console.error)
     getDailyChallengeStatus(user.id).then(status => {
-      console.log('DAILY STATUS:', status)
       setDailyStatus(status)
+    }).catch(console.error)
+
+    // Синхронизируем байты из БД
+    getUserBytes(user.id).then(b => {
+      actions.updateUser({ bytes: b })
     }).catch(console.error)
   }, [user, state.screen])
 
@@ -97,10 +101,16 @@ export default function Hub() {
             }
           </div>
           <div>
-            <div className="font-display text-xl md:text-2xl tracking-wider text-green-800 dark:text-acid">{user?.username}</div>
-            {user?.is_pro && (
-              <span className="text-xs md:text-sm font-mono bg-acid text-ink-900 px-1.5 py-0.5 md:px-2 md:py-1 font-semibold">PRO</span>
-            )}
+            <div className="font-display text-xl md:text-2xl tracking-wider text-green-800 dark:text-acid flex items-center gap-2">
+              {user?.username}
+              {user?.is_pro && (
+                <span className="text-[10px] md:text-xs font-mono bg-acid text-ink-950 px-1.5 py-0.5 font-bold uppercase">PRO</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 mt-1">
+              <div className="w-4 h-4 md:w-5 md:h-5 rounded-full bg-acid flex items-center justify-center text-[10px] md:text-[11px] font-bold text-ink-950 font-mono shadow-[0_0_10px_rgba(202,255,0,0.4)]">B</div>
+              <div className="font-mono text-sm font-bold text-ink-600 dark:text-ink-300 tracking-widest">{user?.bytes || 0}</div>
+            </div>
           </div>
         </div>
 
@@ -167,6 +177,34 @@ export default function Hub() {
             </div>
           </div>
           {!dailyStatus && <div className="absolute inset-0 bg-acid/10 skew-x-12 translate-x-full group-hover:translate-x-[-100%] transition-transform duration-1000 p-2" />}
+        </button>
+      </div>
+
+      {/* Adventure Mode */}
+      <div className="mb-8 md:mb-12">
+        <button
+          onClick={() => actions.setScreen('adventure')}
+          className="w-full relative overflow-hidden group transition-all cursor-pointer hover:scale-[1.02]"
+        >
+          <div className="p-6 md:p-8 lg:p-10 border-2 border-green-600 bg-green-600/5 dark:bg-green-600/10 transition-colors relative z-10 overflow-hidden">
+
+            {/* Background Narrative Glitch */}
+            <div className="absolute top-0 right-0 p-2 opacity-10 font-mono text-[60px] md:text-[80px] leading-none select-none pointer-events-none">SYS_ADV</div>
+
+            <div className="flex items-center justify-between relative z-10">
+              <div className="text-left">
+                <div className="text-xs font-mono text-green-600 dark:text-green-400 uppercase tracking-widest mb-1">Режим приключения</div>
+                <div className="font-display text-3xl md:text-5xl text-green-800 dark:text-green-500 mb-2 whitespace-nowrap">ADVENTURE</div>
+                <div className="text-sm font-mono text-ink-600 dark:text-ink-300">Очисти систему от вирусных угроз</div>
+              </div>
+              <div className="flex flex-col items-center justify-center w-12 h-12 md:w-16 md:h-16 bg-green-600 text-white rounded-full shadow-[0_0_20px_rgba(21,128,61,0.4)]">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div className="absolute inset-0 bg-green-500/10 skew-x-12 translate-x-full group-hover:translate-x-[-100%] transition-transform duration-1000 p-2" />
         </button>
       </div>
 

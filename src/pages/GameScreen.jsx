@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react'
 import { useApp } from '../store/AppContext.jsx'
 import { checkCell, checkWin, getHint, getCellBorders } from '../lib/sudoku.js'
-import { updateGameSession, finishGameSession } from '../lib/api.js'
+import { updateGameSession, finishGameSession, updateUserBytes } from '../lib/api.js'
 import { formatTime } from '../lib/api.js'
+import { sfx, playClick } from '../lib/sounds.js'
 
 export default function GameScreen() {
   const { state, actions } = useApp()
@@ -11,13 +12,27 @@ export default function GameScreen() {
 
   const { solution, cages, cageMap: cageMapRaw, prefilled } = puzzle
 
-  // Строим cageMap (id → cage объект) и cellToCage
-  const cagesById = Object.fromEntries(cages.map(c => [c.id, c]))
-  const cellToCageId = cageMapRaw // "r,c" → id
+  const cagesById = useMemo(
+    () => Object.fromEntries(cages.map(c => [c.id, c])),
+    [cages],
+  )
+  const cellToCageId = cageMapRaw
+  const cageMapForBorders = useMemo(
+    () => Object.fromEntries(
+      Object.entries(cellToCageId).map(([k, id]) => [k, cagesById[id]]),
+    ),
+    [cellToCageId, cagesById],
+  )
+  const cageTopLeft = useMemo(() => {
+    const map = {}
+    for (const cage of cages) {
+      const sorted = [...cage.cells].sort((a, b) => a[0] - b[0] || a[1] - b[1])
+      map[`${sorted[0][0]},${sorted[0][1]}`] = cage.sum
+    }
+    return map
+  }, [cages])
 
-  // Состояние игры
   const [board, setBoard] = useState(() => {
-    // board[r][c] = { value: number|null, draft: Set, isError: bool }
     return Array.from({ length: 9 }, (_, r) =>
       Array.from({ length: 9 }, (__, c) => ({
         value: prefilled[r][c] ?? null,
@@ -27,41 +42,54 @@ export default function GameScreen() {
     )
   })
 
-  const [selected, setSelected] = useState(null) // [row, col]
+  const [selected, setSelected] = useState(null)
   const [draftMode, setDraftMode] = useState(false)
   const [errors, setErrors] = useState(0)
   const [hints, setHints] = useState(0)
   const [seconds, setSeconds] = useState(0)
   const [gameOver, setGameOver] = useState(false)
   const [won, setWon] = useState(false)
+  const [showErrors, setShowErrors] = useState(false)
   const timerRef = useRef()
+  const boardRef = useRef(board)
+  const secondsRef = useRef(0)
+  const gameOverRef = useRef(gameOver)
+  const wonRef = useRef(won)
+  boardRef.current = board
+  secondsRef.current = seconds
+  gameOverRef.current = gameOver
+  wonRef.current = won
 
-  // Таймер
   useEffect(() => {
     timerRef.current = setInterval(() => {
-      setSeconds(s => s + 1)
+      setSeconds(s => {
+        const next = s + 1
+        secondsRef.current = next
+        return next
+      })
     }, 1000)
     return () => clearInterval(timerRef.current)
   }, [])
 
   const stopTimer = () => clearInterval(timerRef.current)
 
-  // Авто-сохранение каждые 30 сек
   useEffect(() => {
     const save = setInterval(() => {
-      if (!gameOver && !won) {
-        const playerInput = {}
-        for (let r = 0; r < 9; r++)
-          for (let c = 0; c < 9; c++)
-            if (board[r][c].value !== null)
-              playerInput[`${r},${c}`] = board[r][c].value
-
-        updateGameSession(sessionId, { player_input: playerInput, time_spent: seconds })
-          .catch(console.error)
+      if (gameOverRef.current || wonRef.current) return
+      const playerInput = {}
+      const b = boardRef.current
+      for (let r = 0; r < 9; r++) {
+        for (let c = 0; c < 9; c++) {
+          if (b[r][c].value !== null) playerInput[`${r},${c}`] = b[r][c].value
+        }
       }
+      updateGameSession(sessionId, {
+        player_input: playerInput,
+        time_spent: secondsRef.current,
+      }).catch(console.error)
     }, 30000)
     return () => clearInterval(save)
-  }, [board, seconds, gameOver, won, sessionId])
+  }, [sessionId])
 
   const isFixed = (r, c) => {
     if (prefilled[r][c] !== null) return true
@@ -69,14 +97,11 @@ export default function GameScreen() {
     return false
   }
 
-  const handleCellClick = (r, c) => {
+  const handleCellClick = useCallback((r, c) => {
     if (gameOver || won) return
-    if (isFixed(r, c) && !draftMode) {
-      setSelected([r, c])
-      return
-    }
+    playClick()
     setSelected([r, c])
-  }
+  }, [gameOver, won])
 
   const handleNumber = useCallback((num) => {
     if (!selected || gameOver || won) return
@@ -97,6 +122,7 @@ export default function GameScreen() {
         next[r][c] = { value: num, draft: new Set(), isError: !isCorrect }
 
         if (!isCorrect) {
+          sfx.wrong()
           const newErrors = errors + 1
           setErrors(newErrors)
           if (newErrors >= 3) {
@@ -108,7 +134,6 @@ export default function GameScreen() {
             setTimeout(() => actions.endGame({ won: false, errors: 3, time: seconds, hints }), 600)
           }
         } else {
-          // Проверить победу
           const flatInput = Array.from({ length: 9 }, (_, row) =>
             Array.from({ length: 9 }, (__, col) => {
               if (row === r && col === c) return num
@@ -116,32 +141,53 @@ export default function GameScreen() {
             })
           )
           if (checkWin(solution, flatInput)) {
+            sfx.win()
             stopTimer()
             setWon(true)
             finishGameSession(sessionId, {
               won: true, errorsCount: errors, hintsUsed: hints, timeSpent: seconds, userId: user.id, difficulty
             }).catch(console.error)
             setTimeout(() => actions.endGame({ won: true, errors, time: seconds, hints }), 600)
+          } else {
+            sfx.correct()
           }
         }
       }
       return next
     })
-  }, [selected, draftMode, errors, hints, seconds, solution, prefilled, gameOver, won, sessionId, difficulty, user.id, actions, board])
+  }, [selected, draftMode, errors, hints, seconds, solution, prefilled, gameOver, won, sessionId, difficulty, user.id, actions])
 
-  const handleHint = () => {
-    if (hints >= 3 || gameOver || won) return
+  const handleScan = async () => {
+    if ((user.bytes || 0) < 15 || gameOver || won) return
     const playerInput = board.map(row => row.map(c => c.value))
     const hint = getHint(solution, playerInput, prefilled)
     if (!hint) return
 
-    setHints(h => h + 1)
-    setBoard(prev => {
-      const next = prev.map(row => row.map(cell => ({ ...cell, draft: new Set(cell.draft) })))
-      next[hint.row][hint.col] = { value: hint.value, draft: new Set(), isError: false }
-      return next
-    })
-    setSelected([hint.row, hint.col])
+    try {
+      const newBytes = await updateUserBytes(user.id, -15)
+      actions.updateUser({ bytes: newBytes })
+      playClick()
+      setHints(h => h + 1)
+      setBoard(prev => {
+        const next = prev.map(row => row.map(cell => ({ ...cell, draft: new Set(cell.draft) })))
+        next[hint.row][hint.col] = { value: hint.value, draft: new Set(), isError: false }
+        return next
+      })
+      setSelected([hint.row, hint.col])
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const handleAnalyze = async () => {
+    if ((user.bytes || 0) < 10 || gameOver || won || showErrors) return
+    try {
+      const newBytes = await updateUserBytes(user.id, -10)
+      actions.updateUser({ bytes: newBytes })
+      setShowErrors(true)
+    } catch (e) {
+      console.error(e)
+    }
   }
 
   const handleErase = () => {
@@ -164,7 +210,6 @@ export default function GameScreen() {
     actions.endGame({ won: false, errors, time: seconds, hints, surrendered: true })
   }
 
-  // Keyboard support
   useEffect(() => {
     const handler = (e) => {
       if (e.key >= '1' && e.key <= '9') handleNumber(parseInt(e.key))
@@ -175,167 +220,56 @@ export default function GameScreen() {
     return () => window.removeEventListener('keydown', handler)
   }, [handleNumber])
 
-  // Get top-left cell of each cage for sum label
-  const cageTopLeft = {}
-  for (const cage of cages) {
-    const sorted = [...cage.cells].sort((a, b) => a[0] - b[0] || a[1] - b[1])
-    cageTopLeft[`${sorted[0][0]},${sorted[0][1]}`] = cage.sum
-  }
-
-  const sel = selected
-
   return (
     <div className="min-h-dvh flex flex-col p-4 md:p-6 lg:p-8 max-w-md md:max-w-3xl lg:max-w-5xl mx-auto transition-all">
       <div className="flex flex-col lg:flex-row lg:gap-20 lg:items-center lg:justify-center">
         <div className="w-full lg:max-w-md">
-          {/* Top bar */}
           <div className="flex items-center justify-between mb-4 md:mb-5">
-            <button
-              onClick={handleSurrender}
-              className="text-xs md:text-sm font-mono text-ink-500 dark:text-ink-400 hover:text-danger transition-colors uppercase tracking-widest"
-            >
-              Сдаться
-            </button>
-            <div className="font-display text-2xl md:text-3xl tracking-widest text-green-900 dark:text-acid transition-colors">
-              {difficulty.toUpperCase()}
-            </div>
+            <button onClick={handleSurrender} className="text-xs md:text-sm font-mono text-ink-500 dark:text-ink-400 hover:text-danger uppercase tracking-widest">Сдаться</button>
+            <div className="font-display text-2xl md:text-3xl tracking-widest text-green-900 dark:text-acid">{difficulty.toUpperCase()}</div>
             <div className="font-mono text-lg md:text-xl text-ink-600 dark:text-ink-300">{formatTime(seconds)}</div>
           </div>
 
-          {/* Error & hint indicators */}
           <div className="flex items-center justify-between mb-4 md:mb-5">
             <div className="flex gap-2 items-center">
-              <span className="text-xs md:text-sm font-mono text-ink-500 dark:text-ink-400 uppercase">Ошибки</span>
+              <span className="text-xs md:text-sm font-mono text-ink-500 uppercase tracking-tighter">Ошибки</span>
               {[0, 1, 2].map(i => (
                 <div key={i} className={`w-3 h-3 md:w-3.5 md:h-3.5 rounded-full ${i < errors ? 'bg-danger' : 'bg-ink-200 dark:bg-ink-700'}`} />
               ))}
             </div>
             <div className="flex gap-2 items-center">
-              {[0, 1, 2].map(i => (
-                <div key={i} className={`w-3 h-3 md:w-3.5 md:h-3.5 rounded-full ${i < hints ? 'bg-acid-dark' : 'bg-ink-200 dark:bg-ink-700'}`} />
-              ))}
-              <span className="text-xs md:text-sm font-mono text-ink-500 dark:text-ink-400 uppercase">Подсказки</span>
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-ink-100 dark:bg-ink-800 rounded">
+                <div className="w-3 h-3 rounded-full bg-acid" />
+                <span className="font-mono text-sm font-bold">{user.bytes || 0}</span>
+              </div>
             </div>
           </div>
 
-          {/* Grid */}
-          <div className="relative select-none mb-4">
-            <div
-              className="grid border-2 border-ink-400 dark:border-ink-300"
-              style={{ gridTemplateColumns: 'repeat(9, 1fr)', aspectRatio: '1' }}
-            >
-              {Array.from({ length: 9 }, (_, r) =>
-                Array.from({ length: 9 }, (__, c) => {
-                  const cell = board[r][c]
-                  const key = `${r},${c}`
-                  const cageId = cellToCageId[key]
-                  const cage = cagesById[cageId]
-                  const borders = cage ? getCellBorders(r, c, Object.fromEntries(
-                    Object.entries(cellToCageId).map(([k, id]) => [k, cagesById[id]])
-                  )) : {}
-
-                  const isSelected = sel && sel[0] === r && sel[1] === c
-                  const isSameValue = sel && board[sel[0]][sel[1]].value && cell.value === board[sel[0]][sel[1]].value && !isSelected
-                  const isHighlighted = sel && (sel[0] === r || sel[1] === c || (
-                    Math.floor(sel[0] / 3) === Math.floor(r / 3) && Math.floor(sel[1] / 3) === Math.floor(c / 3)
-                  ))
-                  const isBox3 = (r % 3 === 0 && r > 0)
-                  const isCol3 = (c % 3 === 0 && c > 0)
-                  const sumLabel = cageTopLeft[key]
-
-                  return (
-                    <div
-                      key={key}
-                      className={`relative flex items-center justify-center cursor-pointer transition-colors
-                    ${isBox3 ? 'border-t-2 border-t-ink-400 dark:border-t-ink-300' : 'border-t border-t-ink-200 dark:border-t-ink-700'}
-                    ${isCol3 ? 'border-l-2 border-l-ink-400 dark:border-l-ink-300' : 'border-l border-l-ink-200 dark:border-l-ink-700'}
-                    ${isSelected ? 'bg-acid/30 dark:bg-acid/20' : isSameValue ? 'bg-acid/15 dark:bg-acid/10' : isHighlighted ? 'bg-ink-100 dark:bg-ink-800' : 'bg-white dark:bg-ink-900'}
-                    ${cell.isError ? '!bg-danger/20' : ''}
-                  `}
-                      style={{ aspectRatio: '1' }}
-                      onClick={() => handleCellClick(r, c)}
-                    >
-                      {/* Cage border outline */}
-                      {cage && (
-                        <div
-                          className="absolute pointer-events-none border-ink-900/30 dark:border-acid/30 border-dashed z-0"
-                          style={{
-                            top: borders.top ? '3px' : '-1px',
-                            bottom: borders.bottom ? '3px' : '-1px',
-                            left: borders.left ? '3px' : '-1px',
-                            right: borders.right ? '3px' : '-1px',
-                            borderTopWidth: borders.top ? '1px' : '0',
-                            borderBottomWidth: borders.bottom ? '1px' : '0',
-                            borderLeftWidth: borders.left ? '1px' : '0',
-                            borderRightWidth: borders.right ? '1px' : '0',
-                          }}
-                        />
-                      )}
-                      {/* Cage sum */}
-                      {sumLabel !== undefined && (
-                        <span className="absolute top-1 left-1 text-[8px] md:text-[9px] lg:text-[10px] font-mono text-ink-900/60 dark:text-acid leading-none z-10">
-                          {sumLabel}
-                        </span>
-                      )}
-
-                      {/* Cell value */}
-                      {cell.value !== null ? (
-                        <span className={`font-mono font-semibold text-sm md:text-lg lg:text-2xl leading-none
-                      ${cell.isError ? 'text-danger' : isFixed(r, c) ? 'text-ink-700 dark:text-ink-100' : 'text-green-900 dark:text-acid'}
-                    `}>
-                          {cell.value}
-                        </span>
-                      ) : cell.draft.size > 0 ? (
-                        <div className="grid grid-cols-3 gap-0 w-full h-full p-0.5 md:p-0.5 lg:p-1">
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-                            <span key={n} className={`text-[6px] md:text-[7px] lg:text-[10px] font-mono text-center leading-none flex items-center justify-center
-                          ${cell.draft.has(n) ? 'text-ink-500 dark:text-ink-300' : 'text-transparent'}
-                        `}>{n}</span>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-
+          <SudokuGrid
+            board={board}
+            selected={selected}
+            showErrors={showErrors}
+            prefilled={prefilled}
+            solution={solution}
+            cellToCageId={cellToCageId}
+            cagesById={cagesById}
+            cageMapForBorders={cageMapForBorders}
+            cageTopLeft={cageTopLeft}
+            onCellClick={handleCellClick}
+          />
         </div>
 
-        {/* Side Controls (PC) / Bottom Controls (Mobile) */}
-        <div className="w-full lg:max-w-md flex flex-col lg:justify-center lg:mt-10">
-          {/* Action buttons */}
-          <div className="grid grid-cols-3 lg:grid-cols-3 gap-2 mb-6 md:mb-8 lg:mb-6">
-            <ActionBtn
-              onClick={handleErase}
-              icon={<EraseIcon />}
-              label="Стереть"
-            />
-            <ActionBtn
-              onClick={() => setDraftMode(m => !m)}
-              icon={<DraftIcon />}
-              label="Черновик"
-              active={draftMode}
-            />
-            <ActionBtn
-              onClick={handleHint}
-              disabled={hints >= 3}
-              icon={<HintIcon />}
-              label={`Подсказка (${3 - hints})`}
-            />
+        <div className="w-full lg:max-w-xs flex flex-col gap-6">
+          <div className="grid grid-cols-4 gap-2">
+            <ActionBtn onClick={handleAnalyze} icon={<SearchIcon />} label="Aнализ (10B)" active={showErrors} disabled={(user.bytes || 0) < 10 || showErrors} />
+            <ActionBtn onClick={() => setDraftMode(m => !m)} icon={<DraftIcon />} label="Черновик" active={draftMode} />
+            <ActionBtn onClick={handleScan} icon={<HintIcon />} label="Сканер (15B)" disabled={(user.bytes || 0) < 15} />
+            <ActionBtn onClick={handleErase} icon={<EraseIcon />} label="Стереть" />
           </div>
 
-          {/* Number pad */}
-          <div className="grid grid-cols-9 lg:grid-cols-3 gap-1 md:gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-              <button
-                key={n}
-                onClick={() => handleNumber(n)}
-                className="aspect-square bg-ink-100 dark:bg-ink-800 font-mono font-semibold text-lg md:text-xl lg:text-2xl text-ink-900 dark:text-ink-100 hover:bg-acid hover:text-ink-900 active:scale-95 transition-all flex items-center justify-center rounded-sm"
-              >
-                {n}
-              </button>
+              <button key={n} onClick={() => handleNumber(n)} className="aspect-square flex items-center justify-center bg-white dark:bg-ink-900 border border-ink-200 dark:border-ink-700 font-display text-2xl hover:bg-acid active:scale-95 transition-all">{n}</button>
             ))}
           </div>
         </div>
@@ -344,21 +278,101 @@ export default function GameScreen() {
   )
 }
 
+const SudokuGrid = memo(function SudokuGrid({
+  board,
+  selected,
+  showErrors,
+  prefilled,
+  solution,
+  cellToCageId,
+  cagesById,
+  cageMapForBorders,
+  cageTopLeft,
+  onCellClick,
+}) {
+  const isFixed = (r, c) => {
+    if (prefilled[r][c] !== null) return true
+    const v = board[r][c].value
+    return v !== null && v === solution[r][c]
+  }
+
+  return (
+    <div className="relative select-none mb-6">
+      <div
+        className="grid border-2 border-ink-400 dark:border-ink-300"
+        style={{ gridTemplateColumns: 'repeat(9, 1fr)', aspectRatio: '1' }}
+      >
+        {Array.from({ length: 9 }, (_, r) =>
+          Array.from({ length: 9 }, (__, c) => {
+            const cell = board[r][c]
+            const key = `${r},${c}`
+            const cageId = cellToCageId[key]
+            const cage = cagesById[cageId]
+            const borders = cage ? getCellBorders(r, c, cageMapForBorders) : {}
+            const isSelected = selected && selected[0] === r && selected[1] === c
+            const sumLabel = cageTopLeft[key]
+            const fixed = isFixed(r, c)
+
+            return (
+              <div
+                key={key}
+                onClick={() => onCellClick(r, c)}
+                className={`relative flex items-center justify-center cursor-pointer aspect-square touch-manipulation ${isSelected ? 'bg-acid/30 dark:bg-acid/20 ring-2 ring-acid ring-inset' : fixed ? 'bg-ink-50 dark:bg-ink-950' : 'bg-white dark:bg-ink-900'} ${r % 3 === 0 && r > 0 ? 'border-t-2 border-t-ink-400 dark:border-t-ink-300' : 'border-t border-t-ink-200 dark:border-t-ink-700'} ${c % 3 === 0 && c > 0 ? 'border-l-2 border-l-ink-400 dark:border-l-ink-300' : 'border-l border-l-ink-200 dark:border-l-ink-700'} ${(cell.isError && showErrors) ? '!bg-danger/20' : ''}`}
+              >
+                {cage && (
+                  <div
+                    className="absolute pointer-events-none border-ink-900/30 dark:border-acid/30 border-dashed z-0"
+                    style={{
+                      top: borders.top ? '3px' : '-1px',
+                      bottom: borders.bottom ? '3px' : '-1px',
+                      left: borders.left ? '3px' : '-1px',
+                      right: borders.right ? '3px' : '-1px',
+                      borderTopWidth: borders.top ? '1px' : '0',
+                      borderBottomWidth: borders.bottom ? '1px' : '0',
+                      borderLeftWidth: borders.left ? '1px' : '0',
+                      borderRightWidth: borders.right ? '1px' : '0',
+                    }}
+                  />
+                )}
+                {sumLabel !== undefined && (
+                  <span className="absolute top-1 left-1 text-[8px] md:text-[10px] font-mono opacity-50 z-10">{sumLabel}</span>
+                )}
+                {cell.value !== null ? (
+                  <span className={`font-mono font-bold text-lg md:text-2xl ${(cell.isError && showErrors) ? 'text-danger' : fixed ? 'text-ink-900 dark:text-ink-100' : 'text-green-600 dark:text-acid'}`}>
+                    {cell.value}
+                  </span>
+                ) : cell.draft.size > 0 ? (
+                  <div className="grid grid-cols-3 gap-0 w-full h-full p-0.5">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                      <span key={n} className={`text-[7px] md:text-[9px] font-mono text-center ${cell.draft.has(n) ? 'text-ink-500 dark:text-ink-300' : 'text-transparent'}`}>{n}</span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )
+          }),
+        )}
+      </div>
+    </div>
+  )
+})
+
 function ActionBtn({ onClick, icon, label, active, disabled }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex flex-col items-center gap-1 px-2 py-3 md:py-4 transition-colors disabled:opacity-30 lg:border lg:border-ink-200 dark:lg:border-ink-700 lg:bg-ink-100 dark:lg:bg-ink-800 lg:hover:border-acid transition-all
-        ${active ? 'text-acid-dark dark:text-acid lg:border-acid' : 'text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-100'}
-      `}
-    >
-      <div className="transform scale-100 md:scale-110">{icon}</div>
-      <span className="text-[9px] md:text-[10px] font-mono uppercase tracking-tight">{label}</span>
+    <button onClick={onClick} disabled={disabled} className={`flex flex-col items-center gap-1 p-2 md:p-3 transition-all disabled:opacity-30 border-2 ${active ? 'border-acid text-acid bg-acid/10' : 'border-ink-200 dark:border-ink-800 text-ink-500 hover:border-acid'}`}>
+      <div className="scale-90 md:scale-100">{icon}</div>
+      <span className="text-[8px] md:text-[9px] font-mono uppercase font-bold text-center leading-tight">{label}</span>
     </button>
   )
 }
 
+function SearchIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+    </svg>
+  )
+}
 function EraseIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

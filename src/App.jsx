@@ -5,6 +5,7 @@ import GameScreen from './pages/GameScreen.jsx'
 import ResultScreen from './pages/ResultScreen.jsx'
 import Settings from './pages/Settings.jsx'
 import DuelScreen from './pages/DuelScreen.jsx'
+import AdventureMode from './pages/AdventureMode.jsx'
 
 function LoadingScreen() {
   return (
@@ -25,6 +26,7 @@ function Router() {
     case 'result': return <ResultScreen />
     case 'settings': return <Settings />
     case 'duel': return <DuelScreen />
+    case 'adventure': return <AdventureMode />
     default: return <LoadingScreen />
   }
 }
