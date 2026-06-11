@@ -1,28 +1,35 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <script>
-      (function () {
-        var theme = 'dark'
-        try {
-          var saved = localStorage.getItem('ks_user')
-          if (saved) {
-            var user = JSON.parse(saved)
-            if (user.theme) theme = user.theme
-          }
-        } catch (_) {}
-        if (theme === 'dark') document.documentElement.classList.add('dark')
-      })()
-    </script>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Killer Sudoku</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+
+<head>
+  <script>
+    (function () {
+      var theme = 'dark'
+      try {
+        var saved = localStorage.getItem('ks_user')
+        if (saved) {
+          var user = JSON.parse(saved)
+          if (user.theme) theme = user.theme
+        }
+      } catch (_) { }
+      if (theme === 'dark') document.documentElement.classList.add('dark')
+    })()
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Killer Sudoku</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap"
+    rel="stylesheet" />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8887127797911926"
+    crossorigin="anonymous"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
 </html>
